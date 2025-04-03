@@ -123,7 +123,7 @@
                 
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0">Top Exchanges</h5>
+                        <h5 class="mb-0">Connected Exchanges (API Keys)</h5>
                     </div>
                     <div class="card-body">
                         <ul class="list-group list-group-flush" id="activeExchanges">
@@ -259,22 +259,25 @@
                     
                     activeExchanges.innerHTML = '';
                     
-                    if (exchanges.length === 0) {
+                    // Filter for exchanges with API keys
+                    const exchangesWithApiKeys = exchanges.filter(exchange => 
+                        exchange.is_active && exchange.api_key && exchange.api_key.trim() !== ''
+                    );
+                    
+                    if (exchangesWithApiKeys.length === 0) {
                         const li = document.createElement('li');
                         li.className = 'list-group-item bg-dark text-center';
-                        li.innerHTML = 'No exchanges configured. Add some in <a href="/settings">Settings</a>.';
+                        li.innerHTML = 'No exchanges connected with API keys. Add some in <a href="/settings">Settings</a>.';
                         activeExchanges.appendChild(li);
                         return;
                     }
                     
-                    exchanges.forEach(exchange => {
+                    exchangesWithApiKeys.forEach(exchange => {
                         const li = document.createElement('li');
                         li.className = 'list-group-item bg-dark d-flex justify-content-between align-items-center';
                         li.innerHTML = `
                             <span>${exchange.exchange_name.charAt(0).toUpperCase() + exchange.exchange_name.slice(1)}</span>
-                            <span class="badge bg-${exchange.is_active ? 'success' : 'secondary'}">
-                                ${exchange.is_active ? 'Active' : 'Inactive'}
-                            </span>
+                            <span class="badge bg-success">Connected</span>
                         `;
                         activeExchanges.appendChild(li);
                     });
