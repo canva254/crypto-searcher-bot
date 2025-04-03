@@ -32,6 +32,29 @@
     </nav>
 
     <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card bg-dark-subtle border-info">
+                    <div class="card-header bg-info bg-opacity-25">
+                        <h5 class="mb-0">Getting Started with Arbitrage Scanner</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-2">Follow these simple steps to start scanning for crypto arbitrage opportunities:</p>
+                        <ol class="mb-3">
+                            <li>Go to <a href="/settings">Settings</a> to configure the exchanges you want to monitor</li>
+                            <li>Add token pairs that you'd like to track (default pairs are already added)</li>
+                            <li>Optional: Add exchange API keys to increase rate limits and access more data</li>
+                            <li>Use the controls below to start/stop the scanner and view real-time opportunities</li>
+                        </ol>
+                        <div class="alert alert-info mb-0">
+                            <i data-feather="info" class="me-2"></i>
+                            <span>The scanner needs at least 2 active exchanges to detect arbitrage opportunities. Price differences are calculated in real-time.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="row">
             <div class="col-lg-8">
                 <div class="card mb-4">
@@ -201,14 +224,14 @@
             // Load settings
             async function loadSettings() {
                 try {
-                    // This would be replaced with an actual API endpoint in a real application
-                    const settings = {
-                        scan_interval: 3.0,
-                        min_profit_threshold: 0.5
-                    };
+                    const response = await fetch('/api/settings');
+                    const data = await response.json();
                     
-                    scanInterval.textContent = `${settings.scan_interval} seconds`;
-                    profitThreshold.textContent = `${settings.min_profit_threshold}%`;
+                    if (data.status === 'success') {
+                        const settings = data.settings;
+                        scanInterval.textContent = `${settings.scan_interval} seconds`;
+                        profitThreshold.textContent = `${settings.min_profit_threshold}%`;
+                    }
                 } catch (error) {
                     console.error('Error fetching settings:', error);
                 }
@@ -217,32 +240,51 @@
             // Load token pairs
             async function loadTokenPairs() {
                 try {
-                    // In a real application, this would fetch from an API
-                    tokenPairCount.textContent = '5 pairs';
+                    const response = await fetch('/api/configured_token_pairs');
+                    const tokenPairs = await response.json();
+                    
+                    const activePairs = tokenPairs.filter(pair => pair.is_active);
+                    tokenPairCount.textContent = `${activePairs.length} pairs`;
                 } catch (error) {
                     console.error('Error fetching token pairs:', error);
+                    tokenPairCount.textContent = '0 pairs';
                 }
             }
             
             // Load exchanges
             async function loadExchanges() {
                 try {
-                    // In a real application, this would fetch from an API
-                    const exchanges = ['binance', 'coinbase', 'kraken', 'kucoin', 'huobi'];
+                    const response = await fetch('/api/configured_exchanges');
+                    const exchanges = await response.json();
                     
                     activeExchanges.innerHTML = '';
+                    
+                    if (exchanges.length === 0) {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item bg-dark text-center';
+                        li.innerHTML = 'No exchanges configured. Add some in <a href="/settings">Settings</a>.';
+                        activeExchanges.appendChild(li);
+                        return;
+                    }
                     
                     exchanges.forEach(exchange => {
                         const li = document.createElement('li');
                         li.className = 'list-group-item bg-dark d-flex justify-content-between align-items-center';
                         li.innerHTML = `
-                            <span>${exchange.charAt(0).toUpperCase() + exchange.slice(1)}</span>
-                            <span class="badge bg-success">Active</span>
+                            <span>${exchange.exchange_name.charAt(0).toUpperCase() + exchange.exchange_name.slice(1)}</span>
+                            <span class="badge bg-${exchange.is_active ? 'success' : 'secondary'}">
+                                ${exchange.is_active ? 'Active' : 'Inactive'}
+                            </span>
                         `;
                         activeExchanges.appendChild(li);
                     });
                 } catch (error) {
                     console.error('Error fetching exchanges:', error);
+                    
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item bg-dark text-center text-danger';
+                    li.innerHTML = 'Error loading exchanges';
+                    activeExchanges.appendChild(li);
                 }
             }
             

@@ -66,7 +66,36 @@ def initialize_components():
                 min_profit_threshold=0.5
             )
             db.session.add(settings)
-            db.session.commit()
+        
+        # Add default exchange configs if none exist
+        exchange_count = ExchangeConfig.query.count()
+        if exchange_count == 0:
+            logger.info("Adding default exchange configurations")
+            default_exchanges = [
+                ExchangeConfig(exchange_name="binance", is_active=True),
+                ExchangeConfig(exchange_name="coinbase", is_active=True),
+                ExchangeConfig(exchange_name="kraken", is_active=True),
+                ExchangeConfig(exchange_name="kucoin", is_active=True),
+                ExchangeConfig(exchange_name="huobi", is_active=True)
+            ]
+            for exchange in default_exchanges:
+                db.session.add(exchange)
+        
+        # Add default token pairs if none exist
+        token_pair_count = TokenPair.query.count()
+        if token_pair_count == 0:
+            logger.info("Adding default token pairs")
+            default_pairs = [
+                TokenPair(base_token="BTC", quote_token="USDT", is_active=True),
+                TokenPair(base_token="ETH", quote_token="USDT", is_active=True),
+                TokenPair(base_token="BNB", quote_token="USDT", is_active=True),
+                TokenPair(base_token="SOL", quote_token="USDT", is_active=True),
+                TokenPair(base_token="ADA", quote_token="USDT", is_active=True)
+            ]
+            for pair in default_pairs:
+                db.session.add(pair)
+        
+        db.session.commit()
         
         # Initialize scanner
         scanner = ExchangeScanner(db)
@@ -186,6 +215,59 @@ def settings():
                           exchange_configs=exchange_configs,
                           token_pairs=token_pairs)
 
+@app.route('/api/settings', methods=['GET', 'POST'])
+def api_settings():
+    """Get or update application settings"""
+    if request.method == 'POST':
+        try:
+            data = request.json
+            settings = Settings.query.first()
+            
+            if not settings:
+                settings = Settings()
+                db.session.add(settings)
+            
+            if 'scan_interval' in data:
+                settings.scan_interval = float(data['scan_interval'])
+            
+            if 'min_profit_threshold' in data:
+                settings.min_profit_threshold = float(data['min_profit_threshold'])
+            
+            db.session.commit()
+            logger.info("Settings updated via API")
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'Settings updated successfully',
+                'settings': {
+                    'scan_interval': settings.scan_interval,
+                    'min_profit_threshold': settings.min_profit_threshold
+                }
+            })
+        except Exception as e:
+            logger.error(f"Error updating settings via API: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 400
+    
+    # GET request
+    settings = Settings.query.first()
+    
+    if not settings:
+        return jsonify({
+            'status': 'success',
+            'settings': {
+                'scan_interval': 3.0,
+                'min_profit_threshold': 0.5
+            }
+        })
+    
+    return jsonify({
+        'status': 'success',
+        'settings': {
+            'scan_interval': settings.scan_interval,
+            'min_profit_threshold': settings.min_profit_threshold
+        }
+    })
+
 @app.route('/api/opportunities')
 def api_opportunities():
     opportunities = ArbitrageOpportunity.query.order_by(ArbitrageOpportunity.timestamp.desc()).limit(20).all()
@@ -207,6 +289,40 @@ def api_exchanges():
         exchanges = ccxt.exchanges
         return jsonify(exchanges)
     except Exception as e:
+        logger.error(f"Error getting exchanges from CCXT: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/configured_exchanges')
+def api_configured_exchanges():
+    """Return list of exchanges that have been configured in the system"""
+    try:
+        exchanges = ExchangeConfig.query.all()
+        return jsonify([{
+            'id': ex.id,
+            'exchange_name': ex.exchange_name,
+            'is_active': ex.is_active,
+            'has_api_key': bool(ex.api_key),
+            'created_at': ex.created_at.isoformat() if ex.created_at else None
+        } for ex in exchanges])
+    except Exception as e:
+        logger.error(f"Error getting configured exchanges: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+        
+@app.route('/api/configured_token_pairs')
+def api_configured_token_pairs():
+    """Return list of token pairs that have been configured in the system"""
+    try:
+        token_pairs = TokenPair.query.all()
+        return jsonify([{
+            'id': pair.id,
+            'symbol': f"{pair.base_token}/{pair.quote_token}",
+            'base_token': pair.base_token,
+            'quote_token': pair.quote_token,
+            'is_active': pair.is_active,
+            'created_at': pair.created_at.isoformat() if pair.created_at else None
+        } for pair in token_pairs])
+    except Exception as e:
+        logger.error(f"Error getting configured token pairs: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/exchange_config', methods=['POST'])
@@ -214,14 +330,21 @@ def api_exchange_config():
     try:
         data = request.json
         exchange_name = data.get('exchange_name')
+        exchange_id = data.get('id')
         
-        if not exchange_name:
-            return jsonify({'status': 'error', 'message': 'Exchange name is required'}), 400
+        if not exchange_name and not exchange_id:
+            return jsonify({'status': 'error', 'message': 'Exchange name or ID is required'}), 400
         
         # Check if config already exists
-        config = ExchangeConfig.query.filter_by(exchange_name=exchange_name).first()
+        if exchange_id:
+            config = ExchangeConfig.query.get(exchange_id)
+            if not config:
+                return jsonify({'status': 'error', 'message': f'Exchange with ID {exchange_id} not found'}), 404
+        else:
+            config = ExchangeConfig.query.filter_by(exchange_name=exchange_name).first()
         
         if not config:
+            # Create new config
             config = ExchangeConfig(
                 exchange_name=exchange_name,
                 api_key=data.get('api_key', ''),
@@ -229,42 +352,104 @@ def api_exchange_config():
                 is_active=data.get('is_active', True)
             )
             db.session.add(config)
+            logger.info(f"Created new exchange config for {exchange_name}")
         else:
-            config.api_key = data.get('api_key', config.api_key)
-            config.api_secret = data.get('api_secret', config.api_secret)
-            config.is_active = data.get('is_active', config.is_active)
+            # Update existing config
+            if 'api_key' in data:
+                config.api_key = data.get('api_key')
+            if 'api_secret' in data:
+                config.api_secret = data.get('api_secret')
+            if 'is_active' in data:
+                config.is_active = data.get('is_active')
+            
+            logger.info(f"Updated exchange config for {config.exchange_name}")
         
         db.session.commit()
-        return jsonify({'status': 'success'})
+        return jsonify({
+            'status': 'success',
+            'message': f"Exchange {config.exchange_name} {'created' if exchange_id is None and not exchange_name else 'updated'} successfully",
+            'exchange': {
+                'id': config.id,
+                'exchange_name': config.exchange_name,
+                'is_active': config.is_active,
+                'has_api_key': bool(config.api_key)
+            }
+        })
     except Exception as e:
+        logger.error(f"Error in api_exchange_config: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @app.route('/api/token_pair', methods=['POST'])
 def api_token_pair():
     try:
         data = request.json
+        pair_id = data.get('id')
+        
+        if pair_id:
+            # Update existing pair
+            pair = TokenPair.query.get(pair_id)
+            if not pair:
+                return jsonify({'status': 'error', 'message': f'Token pair with ID {pair_id} not found'}), 404
+            
+            if 'is_active' in data:
+                pair.is_active = data.get('is_active')
+            
+            db.session.commit()
+            logger.info(f"Updated token pair {pair.base_token}/{pair.quote_token}")
+            
+            return jsonify({
+                'status': 'success',
+                'message': f"Token pair {pair.base_token}/{pair.quote_token} updated successfully",
+                'pair': {
+                    'id': pair.id,
+                    'base_token': pair.base_token,
+                    'quote_token': pair.quote_token,
+                    'is_active': pair.is_active
+                }
+            })
+        
+        # Create new pair
         base_token = data.get('base_token')
         quote_token = data.get('quote_token')
         
         if not base_token or not quote_token:
             return jsonify({'status': 'error', 'message': 'Base and quote tokens are required'}), 400
         
+        # Standardize token symbols to uppercase
+        base_token = base_token.upper()
+        quote_token = quote_token.upper()
+        
         # Check if pair already exists
         pair = TokenPair.query.filter_by(base_token=base_token, quote_token=quote_token).first()
         
         if not pair:
+            # Create new pair
             pair = TokenPair(
                 base_token=base_token,
                 quote_token=quote_token,
                 is_active=data.get('is_active', True)
             )
             db.session.add(pair)
+            logger.info(f"Created new token pair {base_token}/{quote_token}")
         else:
+            # Update existing pair
             pair.is_active = data.get('is_active', pair.is_active)
+            logger.info(f"Updated existing token pair {base_token}/{quote_token}")
         
         db.session.commit()
-        return jsonify({'status': 'success'})
+        
+        return jsonify({
+            'status': 'success',
+            'message': f"Token pair {base_token}/{quote_token} {'created' if not pair else 'updated'} successfully",
+            'pair': {
+                'id': pair.id,
+                'base_token': pair.base_token,
+                'quote_token': pair.quote_token,
+                'is_active': pair.is_active
+            }
+        })
     except Exception as e:
+        logger.error(f"Error in api_token_pair: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @app.route('/api/scanner/start')
