@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - Crypto Arbitrage Bot</title>
+    <title>Settings - Crypto Arbitrage Scanner</title>
     <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -11,7 +11,7 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">Crypto Arbitrage Bot</a>
+            <a class="navbar-brand" href="/">Crypto Arbitrage Scanner</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -47,59 +47,22 @@
             <div class="col-md-6">
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5>General Settings</h5>
+                        <h5 class="mb-0">General Settings</h5>
                     </div>
                     <div class="card-body">
-                        <form method="post" action="/settings">
+                        <form method="POST" action="{{ url_for('settings') }}">
                             <div class="mb-3">
                                 <label for="scan_interval" class="form-label">Scan Interval (seconds)</label>
-                                <input type="number" step="0.1" min="1" class="form-control" id="scan_interval" name="scan_interval" value="{{ settings.scan_interval if settings else 3 }}" required>
-                                <div class="form-text">How often to check for arbitrage opportunities (in seconds)</div>
+                                <input type="number" step="0.1" min="1" class="form-control" id="scan_interval" name="scan_interval" value="{{ settings.scan_interval if settings else 3 }}">
+                                <div class="form-text">How frequently to scan exchanges for arbitrage opportunities</div>
                             </div>
-                            
                             <div class="mb-3">
                                 <label for="min_profit_threshold" class="form-label">Minimum Profit Threshold (%)</label>
-                                <input type="number" step="0.01" min="0" class="form-control" id="min_profit_threshold" name="min_profit_threshold" value="{{ settings.min_profit_threshold if settings else 0.5 }}" required>
-                                <div class="form-text">Minimum profit percentage to save an opportunity</div>
+                                <input type="number" step="0.1" min="0.1" class="form-control" id="min_profit_threshold" name="min_profit_threshold" value="{{ settings.min_profit_threshold if settings else 0.5 }}">
+                                <div class="form-text">Minimum percentage difference to consider as an arbitrage opportunity</div>
                             </div>
-                            
-                            <div class="mb-3">
-                                <label for="gas_price_limit" class="form-label">Gas Price Limit (Gwei)</label>
-                                <input type="number" step="1" min="1" class="form-control" id="gas_price_limit" name="gas_price_limit" value="{{ settings.gas_price_limit if settings else 100 }}" required>
-                                <div class="form-text">Maximum gas price willing to pay for transactions</div>
-                            </div>
-                            
-                            <div class="mb-3 form-check">
-                                <input type="checkbox" class="form-check-input" id="alert_on_opportunities" name="alert_on_opportunities" {% if settings and settings.alert_on_opportunities %}checked{% endif %}>
-                                <label class="form-check-label" for="alert_on_opportunities">Alert on New Opportunities</label>
-                            </div>
-                            
-                            <div class="mb-3 form-check">
-                                <input type="checkbox" class="form-check-input" id="use_flashloans" name="use_flashloans" {% if settings and settings.use_flashloans %}checked{% endif %}>
-                                <label class="form-check-label" for="use_flashloans">Use Flash Loans</label>
-                                <div class="form-text">Enable flash loans for executing arbitrage trades</div>
-                            </div>
-                            
                             <button type="submit" class="btn btn-primary">Save Settings</button>
                         </form>
-                    </div>
-                </div>
-                
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5>Wallet Settings</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-info">
-                            <i data-feather="info"></i> Wallet private key should be provided as an environment variable for security.
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="walletAddress" class="form-label">Wallet Address</label>
-                            <input type="text" class="form-control" id="walletAddress" value="{{ settings.wallet_address if settings and settings.wallet_address else '' }}" placeholder="0x...">
-                        </div>
-                        
-                        <button id="saveWalletBtn" class="btn btn-primary">Save Wallet</button>
                     </div>
                 </div>
             </div>
@@ -107,14 +70,59 @@
             <div class="col-md-6">
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5>Exchange Configuration</h5>
-                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addExchangeModal">
-                            <i data-feather="plus"></i> Add Exchange
+                        <h5 class="mb-0">Token Pairs</h5>
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTokenPairModal">
+                            <i data-feather="plus" class="me-1"></i> Add Pair
                         </button>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-dark">
+                            <table class="table table-hover table-dark">
+                                <thead>
+                                    <tr>
+                                        <th>Pair</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if token_pairs %}
+                                        {% for pair in token_pairs %}
+                                        <tr>
+                                            <td>{{ pair.base_token }}/{{ pair.quote_token }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ 'success' if pair.is_active else 'danger' }}">
+                                                    {{ 'Active' if pair.is_active else 'Inactive' }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary toggle-pair-btn" data-pair-id="{{ pair.id }}" data-pair-active="{{ pair.is_active|int }}">
+                                                    <i data-feather="{{ 'eye-off' if pair.is_active else 'eye' }}"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="3" class="text-center">No token pairs configured</td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Exchange Configurations</h5>
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addExchangeModal">
+                            <i data-feather="plus" class="me-1"></i> Add Exchange
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-dark">
                                 <thead>
                                     <tr>
                                         <th>Exchange</th>
@@ -128,22 +136,16 @@
                                         <tr>
                                             <td>{{ config.exchange_name }}</td>
                                             <td>
-                                                {% if config.is_active %}
-                                                <span class="badge bg-success">Active</span>
-                                                {% else %}
-                                                <span class="badge bg-secondary">Inactive</span>
-                                                {% endif %}
+                                                <span class="badge bg-{{ 'success' if config.is_active else 'danger' }}">
+                                                    {{ 'Active' if config.is_active else 'Inactive' }}
+                                                </span>
                                             </td>
                                             <td>
-                                                <button class="btn btn-sm btn-info me-1" onclick="editExchange('{{ config.exchange_name }}')">
-                                                    <i data-feather="edit"></i>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary toggle-exchange-btn" data-exchange-id="{{ config.id }}" data-exchange-active="{{ config.is_active|int }}">
+                                                    <i data-feather="{{ 'eye-off' if config.is_active else 'eye' }}"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-danger" onclick="toggleExchange('{{ config.exchange_name }}', {{ 'false' if config.is_active else 'true' }})">
-                                                    {% if config.is_active %}
-                                                    <i data-feather="pause"></i>
-                                                    {% else %}
-                                                    <i data-feather="play"></i>
-                                                    {% endif %}
+                                                <button type="button" class="btn btn-sm btn-outline-info edit-exchange-btn" data-exchange-id="{{ config.id }}" data-exchange-name="{{ config.exchange_name }}">
+                                                    <i data-feather="edit"></i>
                                                 </button>
                                             </td>
                                         </tr>
@@ -158,101 +160,6 @@
                         </div>
                     </div>
                 </div>
-                
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5>Token Pairs</h5>
-                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTokenPairModal">
-                            <i data-feather="plus"></i> Add Pair
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-dark">
-                                <thead>
-                                    <tr>
-                                        <th>Pair</th>
-                                        <th>Min Order Size</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% if token_pairs %}
-                                        {% for pair in token_pairs %}
-                                        <tr>
-                                            <td>{{ pair.base_token }}/{{ pair.quote_token }}</td>
-                                            <td>{{ pair.min_order_size }}</td>
-                                            <td>
-                                                {% if pair.is_active %}
-                                                <span class="badge bg-success">Active</span>
-                                                {% else %}
-                                                <span class="badge bg-secondary">Inactive</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                <button class="btn btn-sm btn-info me-1" onclick="editTokenPair('{{ pair.base_token }}', '{{ pair.quote_token }}')">
-                                                    <i data-feather="edit"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-danger" onclick="toggleTokenPair('{{ pair.base_token }}', '{{ pair.quote_token }}', {{ 'false' if pair.is_active else 'true' }})">
-                                                    {% if pair.is_active %}
-                                                    <i data-feather="pause"></i>
-                                                    {% else %}
-                                                    <i data-feather="play"></i>
-                                                    {% endif %}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% else %}
-                                        <tr>
-                                            <td colspan="4" class="text-center">No token pairs configured</td>
-                                        </tr>
-                                    {% endif %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Add Exchange Modal -->
-    <div class="modal fade" id="addExchangeModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add Exchange</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="exchangeSelect" class="form-label">Exchange</label>
-                        <select class="form-select" id="exchangeSelect">
-                            <option value="">Loading exchanges...</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="apiKey" class="form-label">API Key</label>
-                        <input type="text" class="form-control" id="apiKey">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="apiSecret" class="form-label">API Secret</label>
-                        <input type="password" class="form-control" id="apiSecret">
-                    </div>
-                    
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="exchangeActive" checked>
-                        <label class="form-check-label" for="exchangeActive">Active</label>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="saveExchangeBtn">Save</button>
-                </div>
             </div>
         </div>
     </div>
@@ -260,31 +167,26 @@
     <!-- Add Token Pair Modal -->
     <div class="modal fade" id="addTokenPairModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
-            <div class="modal-content">
+            <div class="modal-content bg-dark">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add Token Pair</h5>
+                    <h5 class="modal-title">Add New Token Pair</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="baseToken" class="form-label">Base Token</label>
-                        <input type="text" class="form-control" id="baseToken" placeholder="BTC">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="quoteToken" class="form-label">Quote Token</label>
-                        <input type="text" class="form-control" id="quoteToken" placeholder="USDT">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="minOrderSize" class="form-label">Min Order Size</label>
-                        <input type="number" step="0.001" min="0.001" class="form-control" id="minOrderSize" value="0.01">
-                    </div>
-                    
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="pairActive" checked>
-                        <label class="form-check-label" for="pairActive">Active</label>
-                    </div>
+                    <form id="tokenPairForm">
+                        <div class="mb-3">
+                            <label for="baseToken" class="form-label">Base Token</label>
+                            <input type="text" class="form-control" id="baseToken" required placeholder="e.g. BTC">
+                        </div>
+                        <div class="mb-3">
+                            <label for="quoteToken" class="form-label">Quote Token</label>
+                            <input type="text" class="form-control" id="quoteToken" required placeholder="e.g. USDT">
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="pairActiveCheck" checked>
+                            <label class="form-check-label" for="pairActiveCheck">Active</label>
+                        </div>
+                    </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -293,226 +195,223 @@
             </div>
         </div>
     </div>
+    
+    <!-- Add Exchange Modal -->
+    <div class="modal fade" id="addExchangeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Exchange</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="exchangeForm">
+                        <div class="mb-3">
+                            <label for="exchangeSelect" class="form-label">Exchange</label>
+                            <select class="form-select" id="exchangeSelect" required>
+                                <option value="">Select an exchange</option>
+                                <!-- Options will be populated via JavaScript -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="apiKey" class="form-label">API Key (optional)</label>
+                            <input type="text" class="form-control" id="apiKey" placeholder="API Key for authenticated access">
+                        </div>
+                        <div class="mb-3">
+                            <label for="apiSecret" class="form-label">API Secret (optional)</label>
+                            <input type="password" class="form-control" id="apiSecret" placeholder="API Secret for authenticated access">
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="exchangeActiveCheck" checked>
+                            <label class="form-check-label" for="exchangeActiveCheck">Active</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveExchangeBtn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     
     <script>
-        // Initialize feather icons
         document.addEventListener('DOMContentLoaded', function() {
             feather.replace();
             
-            // Load available exchanges
-            loadExchanges();
-            
-            // Set up button listeners
-            document.getElementById('saveExchangeBtn').addEventListener('click', saveExchange);
-            document.getElementById('saveTokenPairBtn').addEventListener('click', saveTokenPair);
-            document.getElementById('saveWalletBtn').addEventListener('click', saveWallet);
-        });
-        
-        function loadExchanges() {
-            fetch('/api/exchanges')
-                .then(response => response.json())
-                .then(exchanges => {
-                    const select = document.getElementById('exchangeSelect');
-                    select.innerHTML = '';
+            // Load exchanges for dropdown
+            async function loadExchanges() {
+                try {
+                    const response = await fetch('/api/exchanges');
+                    const exchanges = await response.json();
+                    
+                    const exchangeSelect = document.getElementById('exchangeSelect');
+                    exchangeSelect.innerHTML = '<option value="">Select an exchange</option>';
                     
                     exchanges.forEach(exchange => {
                         const option = document.createElement('option');
                         option.value = exchange;
-                        option.textContent = exchange;
-                        select.appendChild(option);
+                        option.textContent = exchange.charAt(0).toUpperCase() + exchange.slice(1);
+                        exchangeSelect.appendChild(option);
                     });
-                })
-                .catch(error => {
+                } catch (error) {
                     console.error('Error loading exchanges:', error);
-                    const select = document.getElementById('exchangeSelect');
-                    select.innerHTML = '<option value="">Error loading exchanges</option>';
+                }
+            }
+            
+            // Save token pair
+            document.getElementById('saveTokenPairBtn').addEventListener('click', async function() {
+                const baseToken = document.getElementById('baseToken').value.toUpperCase();
+                const quoteToken = document.getElementById('quoteToken').value.toUpperCase();
+                const isActive = document.getElementById('pairActiveCheck').checked;
+                
+                if (!baseToken || !quoteToken) {
+                    alert('Please fill in both base and quote tokens');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/token_pair', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            base_token: baseToken,
+                            quote_token: quoteToken,
+                            is_active: isActive
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.status === 'success') {
+                        // Close modal and reload page
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('addTokenPairModal'));
+                        modal.hide();
+                        location.reload();
+                    } else {
+                        alert(`Error: ${result.message}`);
+                    }
+                } catch (error) {
+                    console.error('Error saving token pair:', error);
+                    alert('Error saving token pair');
+                }
+            });
+            
+            // Save exchange
+            document.getElementById('saveExchangeBtn').addEventListener('click', async function() {
+                const exchangeName = document.getElementById('exchangeSelect').value;
+                const apiKey = document.getElementById('apiKey').value;
+                const apiSecret = document.getElementById('apiSecret').value;
+                const isActive = document.getElementById('exchangeActiveCheck').checked;
+                
+                if (!exchangeName) {
+                    alert('Please select an exchange');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/exchange_config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            exchange_name: exchangeName,
+                            api_key: apiKey,
+                            api_secret: apiSecret,
+                            is_active: isActive
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.status === 'success') {
+                        // Close modal and reload page
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('addExchangeModal'));
+                        modal.hide();
+                        location.reload();
+                    } else {
+                        alert(`Error: ${result.message}`);
+                    }
+                } catch (error) {
+                    console.error('Error saving exchange:', error);
+                    alert('Error saving exchange');
+                }
+            });
+            
+            // Toggle token pair active state
+            document.querySelectorAll('.toggle-pair-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const pairId = this.getAttribute('data-pair-id');
+                    const isActive = parseInt(this.getAttribute('data-pair-active')) === 1 ? false : true;
+                    
+                    try {
+                        const response = await fetch('/api/token_pair', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                id: pairId,
+                                is_active: isActive
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.status === 'success') {
+                            location.reload();
+                        } else {
+                            alert(`Error: ${result.message}`);
+                        }
+                    } catch (error) {
+                        console.error('Error toggling token pair:', error);
+                        alert('Error toggling token pair');
+                    }
                 });
-        }
-        
-        function saveExchange() {
-            const exchangeName = document.getElementById('exchangeSelect').value;
-            const apiKey = document.getElementById('apiKey').value;
-            const apiSecret = document.getElementById('apiSecret').value;
-            const isActive = document.getElementById('exchangeActive').checked;
-            
-            if (!exchangeName) {
-                alert('Please select an exchange');
-                return;
-            }
-            
-            const data = {
-                exchange_name: exchangeName,
-                api_key: apiKey,
-                api_secret: apiSecret,
-                is_active: isActive
-            };
-            
-            fetch('/api/exchange_config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    // Close modal and refresh page
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('addExchangeModal'));
-                    modal.hide();
-                    location.reload();
-                } else {
-                    alert('Error: ' + result.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error saving exchange:', error);
-                alert('An error occurred while saving the exchange');
             });
-        }
-        
-        function saveTokenPair() {
-            const baseToken = document.getElementById('baseToken').value.toUpperCase();
-            const quoteToken = document.getElementById('quoteToken').value.toUpperCase();
-            const minOrderSize = parseFloat(document.getElementById('minOrderSize').value);
-            const isActive = document.getElementById('pairActive').checked;
             
-            if (!baseToken || !quoteToken) {
-                alert('Please enter both base and quote tokens');
-                return;
-            }
-            
-            const data = {
-                base_token: baseToken,
-                quote_token: quoteToken,
-                min_order_size: minOrderSize,
-                is_active: isActive
-            };
-            
-            fetch('/api/token_pair', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    // Close modal and refresh page
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('addTokenPairModal'));
-                    modal.hide();
-                    location.reload();
-                } else {
-                    alert('Error: ' + result.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error saving token pair:', error);
-                alert('An error occurred while saving the token pair');
+            // Toggle exchange active state
+            document.querySelectorAll('.toggle-exchange-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const exchangeId = this.getAttribute('data-exchange-id');
+                    const isActive = parseInt(this.getAttribute('data-exchange-active')) === 1 ? false : true;
+                    
+                    try {
+                        const response = await fetch('/api/exchange_config', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                id: exchangeId,
+                                is_active: isActive
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.status === 'success') {
+                            location.reload();
+                        } else {
+                            alert(`Error: ${result.message}`);
+                        }
+                    } catch (error) {
+                        console.error('Error toggling exchange:', error);
+                        alert('Error toggling exchange');
+                    }
+                });
             });
-        }
-        
-        function saveWallet() {
-            const walletAddress = document.getElementById('walletAddress').value;
             
-            fetch('/api/settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    wallet_address: walletAddress
-                })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    alert('Wallet settings saved successfully');
-                } else {
-                    alert('Error: ' + result.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error saving wallet settings:', error);
-                alert('An error occurred while saving wallet settings');
-            });
-        }
-        
-        function editExchange(exchangeName) {
-            alert(`Edit exchange functionality for ${exchangeName} would be implemented here.`);
-            // In a real implementation, you would:
-            // 1. Fetch the exchange details from the server
-            // 2. Populate the modal form with those details
-            // 3. Show the modal
-        }
-        
-        function toggleExchange(exchangeName, makeActive) {
-            if (!confirm(`Are you sure you want to ${makeActive ? 'activate' : 'deactivate'} ${exchangeName}?`)) {
-                return;
-            }
-            
-            fetch('/api/exchange_config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    exchange_name: exchangeName,
-                    is_active: makeActive
-                })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    location.reload();
-                } else {
-                    alert('Error: ' + result.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error toggling exchange:', error);
-                alert('An error occurred while toggling the exchange');
-            });
-        }
-        
-        function editTokenPair(baseToken, quoteToken) {
-            alert(`Edit token pair functionality for ${baseToken}/${quoteToken} would be implemented here.`);
-            // Similar to editExchange, you would fetch details and show a modal
-        }
-        
-        function toggleTokenPair(baseToken, quoteToken, makeActive) {
-            if (!confirm(`Are you sure you want to ${makeActive ? 'activate' : 'deactivate'} ${baseToken}/${quoteToken}?`)) {
-                return;
-            }
-            
-            fetch('/api/token_pair', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    base_token: baseToken,
-                    quote_token: quoteToken,
-                    is_active: makeActive
-                })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    location.reload();
-                } else {
-                    alert('Error: ' + result.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error toggling token pair:', error);
-                alert('An error occurred while toggling the token pair');
-            });
-        }
+            // Initialize exchanges dropdown
+            loadExchanges();
+        });
     </script>
 </body>
 </html>

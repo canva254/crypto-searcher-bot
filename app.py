@@ -43,22 +43,19 @@ db.init_app(app)
 # Import modules after app creation to avoid circular imports
 from models import ArbitrageOpportunity, ExchangeConfig, TokenPair, Settings
 from exchange_scanner import ExchangeScanner
-from profit_calculator import ProfitCalculator
-from blockchain_interface import BlockchainInterface
 
 # Initialize components
 scanner = None
-profit_calculator = None
-blockchain_interface = None
 scan_thread = None
 stop_scan = False
 
 def initialize_components():
     """Initialize the main components of the arbitrage bot"""
-    global scanner, profit_calculator, blockchain_interface
+    global scanner
     
     with app.app_context():
-        # Create tables if they don't exist
+        # Recreate the database schema
+        db.drop_all()
         db.create_all()
         
         # Load settings
@@ -66,18 +63,13 @@ def initialize_components():
         if not settings:
             settings = Settings(
                 scan_interval=3,
-                min_profit_threshold=0.5,
-                gas_price_limit=100,
-                alert_on_opportunities=True,
-                use_flashloans=False
+                min_profit_threshold=0.5
             )
             db.session.add(settings)
             db.session.commit()
         
-        # Initialize components with settings
+        # Initialize scanner
         scanner = ExchangeScanner(db)
-        profit_calculator = ProfitCalculator()
-        blockchain_interface = BlockchainInterface()
 
 def scan_for_opportunities():
     """Background task to continuously scan for arbitrage opportunities"""
@@ -93,35 +85,37 @@ def scan_for_opportunities():
                 exchange_configs = ExchangeConfig.query.filter_by(is_active=True).all()
                 token_pairs = TokenPair.query.filter_by(is_active=True).all()
                 
-                if exchange_configs and token_pairs:
-                    # Scan exchanges for price differences
-                    opportunities = scanner.scan_exchanges(exchange_configs, token_pairs)
-                    
-                    # Calculate profits for each opportunity
-                    for opportunity in opportunities:
-                        calculated_opportunity = profit_calculator.calculate_profit(opportunity)
+                # Scan exchanges for price differences
+                opportunities = scanner.scan_exchanges(exchange_configs, token_pairs)
+                
+                # Save opportunities to database
+                for opportunity in opportunities:
+                    # Check if opportunity meets minimum threshold
+                    if opportunity.price_difference_percentage >= settings.min_profit_threshold:
+                        # Delete older opportunities to prevent database growth
+                        # Keep only the most recent 100 records
+                        count = ArbitrageOpportunity.query.count()
+                        if count > 100:
+                            old_records = ArbitrageOpportunity.query.order_by(
+                                ArbitrageOpportunity.timestamp.asc()
+                            ).limit(count - 100).all()
+                            for record in old_records:
+                                db.session.delete(record)
                         
-                        # Save profitable opportunities to database
-                        if calculated_opportunity.estimated_profit_percentage >= settings.min_profit_threshold:
-                            new_opportunity = ArbitrageOpportunity(
-                                token_pair=calculated_opportunity.token_pair,
-                                buy_exchange=calculated_opportunity.buy_exchange,
-                                sell_exchange=calculated_opportunity.sell_exchange,
-                                buy_price=calculated_opportunity.buy_price,
-                                sell_price=calculated_opportunity.sell_price,
-                                price_difference=calculated_opportunity.price_difference,
-                                price_difference_percentage=calculated_opportunity.price_difference_percentage,
-                                estimated_profit=calculated_opportunity.estimated_profit,
-                                estimated_profit_percentage=calculated_opportunity.estimated_profit_percentage,
-                                gas_cost_estimate=calculated_opportunity.gas_cost_estimate,
-                                exchange_fee_estimate=calculated_opportunity.exchange_fee_estimate,
-                                flashloan_fee_estimate=calculated_opportunity.flashloan_fee_estimate,
-                                execution_status="pending",
-                                timestamp=datetime.utcnow()
-                            )
-                            db.session.add(new_opportunity)
-                            db.session.commit()
-                            logger.info(f"New profitable opportunity found: {new_opportunity.token_pair} with {new_opportunity.estimated_profit_percentage:.2f}% profit")
+                        new_opportunity = ArbitrageOpportunity(
+                            token_pair=opportunity.token_pair,
+                            buy_exchange=opportunity.buy_exchange,
+                            sell_exchange=opportunity.sell_exchange,
+                            buy_price=opportunity.buy_price,
+                            sell_price=opportunity.sell_price,
+                            price_difference=opportunity.price_difference,
+                            price_difference_percentage=opportunity.price_difference_percentage,
+                            timestamp=datetime.utcnow()
+                        )
+                        db.session.add(new_opportunity)
+                
+                db.session.commit()
+                logger.info(f"Scan complete. Found {len(opportunities)} opportunities.")
                 
                 # Sleep for the configured interval
                 time.sleep(scan_interval)
@@ -175,9 +169,6 @@ def settings():
             
             settings.scan_interval = float(request.form.get('scan_interval', 3))
             settings.min_profit_threshold = float(request.form.get('min_profit_threshold', 0.5))
-            settings.gas_price_limit = int(request.form.get('gas_price_limit', 100))
-            settings.alert_on_opportunities = 'alert_on_opportunities' in request.form
-            settings.use_flashloans = 'use_flashloans' in request.form
             
             db.session.commit()
             flash('Settings updated successfully', 'success')
@@ -206,8 +197,6 @@ def api_opportunities():
         'buy_price': float(opp.buy_price),
         'sell_price': float(opp.sell_price),
         'price_difference_percentage': float(opp.price_difference_percentage),
-        'estimated_profit_percentage': float(opp.estimated_profit_percentage),
-        'execution_status': opp.execution_status,
         'timestamp': opp.timestamp.isoformat()
     } for opp in opportunities])
 
@@ -219,28 +208,6 @@ def api_exchanges():
         return jsonify(exchanges)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-@app.route('/api/settings', methods=['POST'])
-def api_settings():
-    try:
-        data = request.json
-        settings = Settings.query.first()
-        
-        if 'scan_interval' in data:
-            settings.scan_interval = float(data['scan_interval'])
-        if 'min_profit_threshold' in data:
-            settings.min_profit_threshold = float(data['min_profit_threshold'])
-        if 'gas_price_limit' in data:
-            settings.gas_price_limit = int(data['gas_price_limit'])
-        if 'alert_on_opportunities' in data:
-            settings.alert_on_opportunities = bool(data['alert_on_opportunities'])
-        if 'use_flashloans' in data:
-            settings.use_flashloans = bool(data['use_flashloans'])
-        
-        db.session.commit()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @app.route('/api/exchange_config', methods=['POST'])
 def api_exchange_config():
@@ -259,14 +226,12 @@ def api_exchange_config():
                 exchange_name=exchange_name,
                 api_key=data.get('api_key', ''),
                 api_secret=data.get('api_secret', ''),
-                additional_params=json.dumps(data.get('additional_params', {})),
                 is_active=data.get('is_active', True)
             )
             db.session.add(config)
         else:
             config.api_key = data.get('api_key', config.api_key)
             config.api_secret = data.get('api_secret', config.api_secret)
-            config.additional_params = json.dumps(data.get('additional_params', json.loads(config.additional_params)))
             config.is_active = data.get('is_active', config.is_active)
         
         db.session.commit()
@@ -291,58 +256,16 @@ def api_token_pair():
             pair = TokenPair(
                 base_token=base_token,
                 quote_token=quote_token,
-                min_order_size=data.get('min_order_size', 0.01),
                 is_active=data.get('is_active', True)
             )
             db.session.add(pair)
         else:
-            pair.min_order_size = data.get('min_order_size', pair.min_order_size)
             pair.is_active = data.get('is_active', pair.is_active)
         
         db.session.commit()
         return jsonify({'status': 'success'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
-
-@app.route('/api/execute_trade/<int:opportunity_id>')
-def execute_trade(opportunity_id):
-    try:
-        opportunity = ArbitrageOpportunity.query.get(opportunity_id)
-        if not opportunity:
-            return jsonify({'status': 'error', 'message': 'Opportunity not found'}), 404
-        
-        if opportunity.execution_status != 'pending':
-            return jsonify({'status': 'error', 'message': f'Opportunity already {opportunity.execution_status}'}), 400
-        
-        # Update status to processing
-        opportunity.execution_status = 'processing'
-        db.session.commit()
-        
-        # Execute the trade (this would be a background task in production)
-        settings = Settings.query.first()
-        
-        if settings.use_flashloans:
-            # Use blockchain interface to execute flashloan trade
-            result = blockchain_interface.execute_flashloan_trade(opportunity)
-        else:
-            # Use blockchain interface to execute regular trade
-            result = blockchain_interface.execute_trade(opportunity)
-        
-        if result['status'] == 'success':
-            opportunity.execution_status = 'completed'
-            opportunity.transaction_hash = result.get('transaction_hash')
-            opportunity.actual_profit = result.get('actual_profit')
-            flash('Trade executed successfully!', 'success')
-        else:
-            opportunity.execution_status = 'failed'
-            opportunity.failure_reason = result.get('message')
-            flash(f'Trade execution failed: {result.get("message")}', 'danger')
-        
-        db.session.commit()
-        return jsonify({'status': 'success', 'redirect': url_for('opportunities')})
-    except Exception as e:
-        logger.error(f"Error executing trade: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/scanner/start')
 def api_start_scanner():
