@@ -1,0 +1,148 @@
+/* Custom styles for Crypto Arbitrage Bot */
+
+/* Dashboard statistics cards */
+.stats-card {
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Recent opportunities list */
+.recent-opportunities {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.opportunity-item {
+    padding: 10px;
+    border-bottom: 1px solid var(--bs-dark);
+    transition: background-color 0.2s ease;
+}
+
+.opportunity-item:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Opportunities table */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Custom scrollbar for better UX */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #212529;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Animated scanner status indicator */
+.scanner-active {
+    color: #28a745;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Profit percentage color coding */
+.profit-high {
+    color: #28a745 !important;
+    font-weight: bold;
+}
+
+.profit-medium {
+    color: #ffc107 !important;
+}
+
+.profit-low {
+    color: #dc3545 !important;
+}
+
+/* Custom modal styling */
+.modal-header {
+    border-bottom: 1px solid #333;
+}
+
+.modal-footer {
+    border-top: 1px solid #333;
+}
+
+/* Card hover effects */
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Footer styling */
+footer {
+    padding: 20px 0;
+    margin-top: 40px;
+    background-color: #212529;
+    color: #6c757d;
+}
+
+/* Navigation active state */
+.nav-link.active {
+    font-weight: bold;
+    border-bottom: 2px solid var(--bs-primary);
+}
+
+/* Button subtle hover effects */
+.btn {
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Toast notifications */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+}

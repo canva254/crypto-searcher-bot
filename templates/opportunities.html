@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arbitrage Opportunities - Crypto Arbitrage Bot</title>
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Crypto Arbitrage Bot</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/opportunities">Opportunities</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/settings">Settings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Arbitrage Opportunities</h5>
+                        <div>
+                            <select id="filterStatus" class="form-select form-select-sm">
+                                <option value="all">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="processing">Processing</option>
+                                <option value="completed">Completed</option>
+                                <option value="failed">Failed</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-dark">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Pair</th>
+                                        <th>Buy Exchange</th>
+                                        <th>Sell Exchange</th>
+                                        <th>Price Diff %</th>
+                                        <th>Est. Profit %</th>
+                                        <th>Gas Cost</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="opportunitiesTable">
+                                    {% if opportunities %}
+                                        {% for opp in opportunities %}
+                                        <tr data-status="{{ opp.execution_status }}">
+                                            <td>{{ opp.timestamp.strftime('%H:%M:%S') }}</td>
+                                            <td>{{ opp.token_pair }}</td>
+                                            <td>{{ opp.buy_exchange }}<br><small>${{ '%.6f'|format(opp.buy_price) }}</small></td>
+                                            <td>{{ opp.sell_exchange }}<br><small>${{ '%.6f'|format(opp.sell_price) }}</small></td>
+                                            <td {% if opp.price_difference_percentage > 0 %}class="text-success"{% else %}class="text-danger"{% endif %}>
+                                                {{ '%.2f'|format(opp.price_difference_percentage) }}%
+                                            </td>
+                                            <td {% if opp.estimated_profit_percentage > 0 %}class="text-success"{% else %}class="text-danger"{% endif %}>
+                                                {{ '%.2f'|format(opp.estimated_profit_percentage) }}%
+                                            </td>
+                                            <td>${{ '%.2f'|format(opp.gas_cost_estimate or 0) }}</td>
+                                            <td>
+                                                {% if opp.execution_status == 'pending' %}
+                                                <span class="badge bg-warning">Pending</span>
+                                                {% elif opp.execution_status == 'processing' %}
+                                                <span class="badge bg-info">Processing</span>
+                                                {% elif opp.execution_status == 'completed' %}
+                                                <span class="badge bg-success">Completed</span>
+                                                {% elif opp.execution_status == 'failed' %}
+                                                <span class="badge bg-danger">Failed</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <button onclick="showDetails({{ opp.id }})" class="btn btn-sm btn-info me-1">
+                                                    <i data-feather="info"></i>
+                                                </button>
+                                                {% if opp.execution_status == 'pending' %}
+                                                <button onclick="executeTrade({{ opp.id }})" class="btn btn-sm btn-success">
+                                                    <i data-feather="play"></i>
+                                                </button>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="9" class="text-center">No opportunities found yet</td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Opportunity Details Modal -->
+    <div class="modal fade" id="opportunityDetailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-dark">
+                    <h5 class="modal-title">Opportunity Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Token Pair:</strong> <span id="detailTokenPair"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Buy Exchange:</strong> <span id="detailBuyExchange"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Buy Price:</strong> <span id="detailBuyPrice"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Sell Exchange:</strong> <span id="detailSellExchange"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Sell Price:</strong> <span id="detailSellPrice"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Price Difference:</strong> <span id="detailPriceDiff"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Estimated Profit:</strong> <span id="detailProfit"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Estimated Profit %:</strong> <span id="detailProfitPerc"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Gas Cost:</strong> <span id="detailGasCost"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Exchange Fees:</strong> <span id="detailExchangeFees"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Flashloan Fees:</strong> <span id="detailFlashloanFees"></span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Status:</strong> <span id="detailStatus"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="executionDetails" class="mt-3 d-none">
+                        <h6>Execution Details</h6>
+                        <div class="mb-3">
+                            <strong>Transaction Hash:</strong> <span id="detailTxHash"></span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Actual Profit:</strong> <span id="detailActualProfit"></span>
+                        </div>
+                    </div>
+                    
+                    <div id="failureDetails" class="mt-3 d-none">
+                        <h6>Failure Details</h6>
+                        <div class="alert alert-danger" id="detailFailureReason"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success d-none" id="detailExecuteBtn" data-opportunity-id="">Execute Trade</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <script>
+        // Initialize feather icons
+        document.addEventListener('DOMContentLoaded', function() {
+            feather.replace();
+            
+            // Set up filter functionality
+            document.getElementById('filterStatus').addEventListener('change', function() {
+                const status = this.value;
+                const rows = document.querySelectorAll('#opportunitiesTable tr');
+                
+                rows.forEach(row => {
+                    if (status === 'all' || row.dataset.status === status) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+            
+            // Auto-refresh the page every 30 seconds
+            setInterval(function() {
+                location.reload();
+            }, 30000);
+        });
+        
+        function showDetails(opportunityId) {
+            // Fetch opportunity details from the server
+            fetch(`/api/opportunities`)
+                .then(response => response.json())
+                .then(opportunities => {
+                    const opportunity = opportunities.find(o => o.id === opportunityId);
+                    
+                    if (!opportunity) {
+                        alert('Opportunity not found');
+                        return;
+                    }
+                    
+                    // Populate the modal with opportunity details
+                    document.getElementById('detailTokenPair').textContent = opportunity.token_pair;
+                    document.getElementById('detailBuyExchange').textContent = opportunity.buy_exchange;
+                    document.getElementById('detailBuyPrice').textContent = opportunity.buy_price.toFixed(6);
+                    document.getElementById('detailSellExchange').textContent = opportunity.sell_exchange;
+                    document.getElementById('detailSellPrice').textContent = opportunity.sell_price.toFixed(6);
+                    document.getElementById('detailPriceDiff').textContent = opportunity.price_difference_percentage.toFixed(2) + '%';
+                    document.getElementById('detailProfit').textContent = '$' + (opportunity.estimated_profit || 0).toFixed(4);
+                    document.getElementById('detailProfitPerc').textContent = opportunity.estimated_profit_percentage.toFixed(2) + '%';
+                    document.getElementById('detailGasCost').textContent = '$' + (opportunity.gas_cost_estimate || 0).toFixed(2);
+                    document.getElementById('detailExchangeFees').textContent = '$' + (opportunity.exchange_fee_estimate || 0).toFixed(2);
+                    document.getElementById('detailFlashloanFees').textContent = '$' + (opportunity.flashloan_fee_estimate || 0).toFixed(2);
+                    
+                    // Set status with appropriate styling
+                    let statusHtml = '';
+                    if (opportunity.execution_status === 'pending') {
+                        statusHtml = '<span class="badge bg-warning">Pending</span>';
+                    } else if (opportunity.execution_status === 'processing') {
+                        statusHtml = '<span class="badge bg-info">Processing</span>';
+                    } else if (opportunity.execution_status === 'completed') {
+                        statusHtml = '<span class="badge bg-success">Completed</span>';
+                    } else if (opportunity.execution_status === 'failed') {
+                        statusHtml = '<span class="badge bg-danger">Failed</span>';
+                    }
+                    document.getElementById('detailStatus').innerHTML = statusHtml;
+                    
+                    // Show execution details if completed
+                    if (opportunity.execution_status === 'completed') {
+                        document.getElementById('executionDetails').classList.remove('d-none');
+                        document.getElementById('detailTxHash').textContent = opportunity.transaction_hash || 'N/A';
+                        document.getElementById('detailActualProfit').textContent = '$' + (opportunity.actual_profit || 0).toFixed(4);
+                    } else {
+                        document.getElementById('executionDetails').classList.add('d-none');
+                    }
+                    
+                    // Show failure details if failed
+                    if (opportunity.execution_status === 'failed') {
+                        document.getElementById('failureDetails').classList.remove('d-none');
+                        document.getElementById('detailFailureReason').textContent = opportunity.failure_reason || 'Unknown failure reason';
+                    } else {
+                        document.getElementById('failureDetails').classList.add('d-none');
+                    }
+                    
+                    // Show execute button if pending
+                    const executeBtn = document.getElementById('detailExecuteBtn');
+                    if (opportunity.execution_status === 'pending') {
+                        executeBtn.classList.remove('d-none');
+                        executeBtn.dataset.opportunityId = opportunity.id;
+                    } else {
+                        executeBtn.classList.add('d-none');
+                    }
+                    
+                    // Show the modal
+                    const modal = new bootstrap.Modal(document.getElementById('opportunityDetailsModal'));
+                    modal.show();
+                })
+                .catch(error => {
+                    console.error('Error fetching opportunity details:', error);
+                    alert('Error fetching opportunity details');
+                });
+        }
+        
+        function executeTrade(opportunityId) {
+            if (!confirm('Are you sure you want to execute this trade?')) {
+                return;
+            }
+            
+            // Call the API to execute the trade
+            fetch(`/api/execute_trade/${opportunityId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Trade execution initiated successfully!');
+                        location.reload();
+                    } else {
+                        alert('Error executing trade: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error executing trade:', error);
+                    alert('Error executing trade. Check console for details.');
+                });
+        }
+        
+        // Set up execute button in modal
+        document.getElementById('detailExecuteBtn').addEventListener('click', function() {
+            const opportunityId = this.dataset.opportunityId;
+            executeTrade(opportunityId);
+        });
+    </script>
+</body>
+</html>
