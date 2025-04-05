@@ -111,8 +111,8 @@ class UniswapV3Interface:
             
             # Default to Infura if not provided elsewhere
             if not rpc_url:
-                rpc_url = "https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"  # Public key
-                logger.warning("No RPC_URL found in database or .env file, using public Infura node")
+                rpc_url = "https://mainnet.infura.io/v3/8f869800e73e4de2ba792d9ec67cab85"  # User's Infura key
+                logger.warning("No RPC_URL found in database or .env file, using user's Infura node")
                 
             self.web3 = Web3(Web3.HTTPProvider(rpc_url))
             if not self.web3.is_connected():
