@@ -12,5 +12,6 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "python-dotenv>=1.1.0",
     "sqlalchemy>=2.0.40",
+    "trafilatura>=2.0.0",
     "web3>=7.10.0",
 ]
