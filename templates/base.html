@@ -21,7 +21,13 @@
                         <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">Dashboard</a>
                     </li>
                     <li class="nav-item">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/market' %}active{% endif %}" href="/market">Market Data</a>
+                    </li>
                         <a class="nav-link {% if request.path == '/opportunities' %}active{% endif %}" href="/opportunities">Opportunities</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/market' %}active{% endif %}" href="/market">Market Data</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == '/uniswap/details' %}active{% endif %}" href="/uniswap/details">Uniswap Details</a>

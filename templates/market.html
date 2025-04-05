@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+
+{% block title %}Market Data - Arbitrage Bot{% endblock %}
+
+{% block content %}
+<div class="container px-0">
+    <!-- Spot Prices Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">Spot Prices</h2>
+            <div class="spot-price-container">
+                <div class="row g-3" id="spot-prices">
+                    <!-- Spot prices will be loaded here via JavaScript -->
+                    <div class="col-md-4 col-lg-2-4">
+                        <div class="card spot-price-card">
+                            <div class="card-body py-3">
+                                <div class="d-flex align-items-center">
+                                    <div class="crypto-icon me-2">
+                                        <i class="bi bi-currency-bitcoin text-warning"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="fw-bold mb-0">BTC</h4>
+                                        <small class="text-secondary">Loading...</small>
+                                    </div>
+                                    <div class="ms-auto">
+                                        <span class="price-change">
+                                            <i class="bi bi-arrow-up-right"></i> --
+                                        </span>
+                                    </div>
+                                </div>
+                                <h3 class="mt-2 mb-0 price-value">$--,---.--</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Exchange Data Tables Section -->
+        <div class="col-md-8 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">All Exchanges Liquidity Pools</h5>
+                    <div class="exchange-tabs btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary active" data-exchange="all">All</button>
+                        <button type="button" class="btn btn-outline-primary" data-exchange="uniswap">Uniswap</button>
+                        <button type="button" class="btn btn-outline-primary" data-exchange="coinbase">Coinbase</button>
+                        <button type="button" class="btn btn-outline-primary" data-exchange="kraken">Kraken</button>
+                        <button type="button" class="btn btn-outline-primary" data-exchange="kucoin">KuCoin</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Pool</th>
+                                    <th>Exchange</th>
+                                    <th>TVL (USD)</th>
+                                    <th>24h Volume</th>
+                                    <th>APY</th>
+                                    <th>Reserves</th>
+                                </tr>
+                            </thead>
+                            <tbody id="liquidity-pools-table">
+                                <tr>
+                                    <td colspan="6" class="text-center py-3">
+                                        <div class="d-flex justify-content-center">
+                                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            Loading liquidity data...
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gas Fee Monitor & Slippage Section -->
+        <div class="col-md-4">
+            <!-- Gas Fee Monitor -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Gas Fee Monitor</h5>
+                    <small class="text-muted" id="gas-update-time">Last updated: --:--:--</small>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Fast</span>
+                            <span id="gas-fast">-- gwei</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-info" id="gas-fast-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Average</span>
+                            <span id="gas-average">-- gwei</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-primary" id="gas-average-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Slow</span>
+                            <span id="gas-slow">-- gwei</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" id="gas-slow-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="text-center small text-muted mt-4" id="data-update-info">
+                        Data updated
+                        <div>Fetched 0 tokens and 0 liquidity pools</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slippage & Price Impact -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Slippage & Price Impact</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="trade-amount" class="form-label">Trade Amount (ETH)</label>
+                        <input type="number" class="form-control" id="trade-amount" value="1" min="0.1" step="0.1">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label">Slippage Tolerance</label>
+                        <div class="d-flex align-items-center">
+                            <input type="range" class="form-range flex-grow-1 me-2" id="slippage-tolerance" min="0.1" max="2" step="0.1" value="0.5">
+                            <span id="slippage-value">0.5%</span>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="row">
+                            <div class="col-7">Expected Output</div>
+                            <div class="col-5 text-end" id="expected-output">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="row">
+                            <div class="col-7">Minimum Received</div>
+                            <div class="col-5 text-end" id="minimum-received">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="row">
+                            <div class="col-7">Price Impact</div>
+                            <div class="col-5 text-end text-success" id="price-impact">0.00%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trading Opportunities Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Arbitrage Opportunities</h5>
+                    <span class="badge bg-success px-3 py-2" id="opportunities-count">Live</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Pair</th>
+                                    <th>Buy</th>
+                                    <th>Sell</th>
+                                    <th>Price Diff</th>
+                                    <th>Est. Profit</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="arbitrage-opportunities">
+                                <tr>
+                                    <td colspan="6" class="text-center">
+                                        Scanning for opportunities...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/market.js') }}"></script>
+{% endblock %}

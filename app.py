@@ -589,3 +589,12 @@ def uniswap_details():
     pair_symbols = [f"{pair.base_token}-{pair.quote_token}" for pair in token_pairs]
     
     return render_template('uniswap_details.html', token_pairs=pair_symbols)
+
+@app.route('/market')
+def market():
+    """Page to display market data in a dashboard format"""
+    # Get token pairs that are configured for arbitrage
+    token_pairs = TokenPair.query.filter_by(is_active=True).all()
+    exchanges = ExchangeConfig.query.filter_by(is_active=True).all()
+    
+    return render_template('market.html', token_pairs=token_pairs, exchanges=exchanges)

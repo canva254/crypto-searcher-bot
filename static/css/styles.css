@@ -1,65 +1,142 @@
-/* Custom styles for the Arbitrage Bot UI */
+/* Custom styles for Arbitrage Bot */
 
-/* Add some padding to the bottom of the page for better scrolling */
+/* Layout & Container */
 body {
-    padding-bottom: 60px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Add space above cards */
-.card {
-    margin-bottom: 1.5rem;
-}
-
-/* Style for the footer */
 .footer {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    height: 60px;
-    line-height: 60px;
-    background-color: var(--bs-dark);
-    z-index: 1030;
+    margin-top: auto;
 }
 
-/* Make tables more readable */
-.table {
-    font-size: 0.9rem;
+/* Spot Price Cards */
+.spot-price-card {
+    border-radius: 0.5rem;
+    transition: transform 0.2s ease-in-out;
+    height: 100%;
 }
 
-/* Improve form controls spacing */
-.form-group {
-    margin-bottom: 1rem;
-}
-
-/* Improve button spacing */
-.btn {
-    margin-right: 0.25rem;
-}
-
-/* Add nice transition effects to hover states */
-.card:hover {
+.spot-price-card:hover {
+    transform: translateY(-3px);
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    transition: box-shadow 0.3s ease-in-out;
 }
 
-/* Make sure scrollable tables work well */
+.crypto-icon i {
+    font-size: 1.5rem;
+}
+
+.price-change {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.price-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+/* Grid layout for crypto cards */
+.col-lg-2-4 {
+    width: 20%;
+}
+
+@media (max-width: 1199.98px) {
+    .col-lg-2-4 {
+        width: 33.33%;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .col-lg-2-4 {
+        width: 50%;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .col-lg-2-4 {
+        width: 100%;
+    }
+}
+
+/* Exchange badges */
+.exchange-badge {
+    min-width: 80px;
+    text-align: center;
+}
+
+.exchange-badge.uniswap {
+    background-color: #ff007a;
+}
+
+.exchange-badge.coinbase {
+    background-color: #0052ff;
+}
+
+.exchange-badge.kraken {
+    background-color: #5841d8;
+}
+
+.exchange-badge.kucoin {
+    background-color: #26a17b;
+}
+
+/* Exchange tab buttons */
+.exchange-tabs {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 767.98px) {
+    .exchange-tabs {
+        width: 100%;
+        margin-top: 10px;
+    }
+}
+
+/* Gas fee monitor */
+.progress {
+    height: 8px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #2c2c2c;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+/* Responsive tables */
 .table-responsive {
-    max-height: 500px;
-    overflow-y: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-/* Highlight high-profit opportunities */
-.high-profit {
-    background-color: rgba(25, 135, 84, 0.2) !important;
+/* Transitions */
+.card, .btn, .badge {
+    transition: all 0.2s ease-in-out;
 }
 
-/* Style for loading spinners */
-.spinner-border-sm {
-    width: 1rem;
-    height: 1rem;
+/* Card hover effect */
+.card:hover {
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
 }
 
-/* Improve alert spacing */
-.alert {
-    margin-bottom: 1rem;
+/* Opportunities Badge */
+#opportunities-count {
+    font-size: 0.85rem;
+    font-weight: 600;
 }
