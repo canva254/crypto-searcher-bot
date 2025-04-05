@@ -17,11 +17,27 @@ To set up your local development environment, follow these steps:
 
 1. Clone the repository
 2. Create a virtual environment with Python 3.11+
-3. Install dependencies from pyproject.toml
-4. Configure your environment variables (.env file)
-5. Start the application with python main.py
+3. Install the following dependencies:
+   - ccxt
+   - email-validator
+   - flask
+   - flask-sqlalchemy
+   - gunicorn
+   - psycopg2-binary
+   - python-dotenv
+   - sqlalchemy
+   - trafilatura
+   - web3
+4. Configure your environment variables in a `.env` file with:
+   ```
+   DATABASE_URL=postgresql://your_user:your_password@localhost:5432/arbitrage_bot
+   FLASK_SECRET_KEY=your_random_secret_key
+   # Optional Ethereum provider URL
+   WEB3_PROVIDER_URI=https://mainnet.infura.io/v3/your_infura_key
+   ```
+5. Start the application with `python main.py`
 
-Detailed instructions are provided in the documentation.
+See the IDE-SETTINGS.md file for recommended VS Code configuration.
 
 ## License
 
