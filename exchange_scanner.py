@@ -210,6 +210,17 @@ class ExchangeScanner:
                 price_diff_percentage = (price_diff / buy_price) * 100
                 
                 # Create opportunity object
+                # Handle case where one of the timestamps might be None
+                if buy_timestamp is None and sell_timestamp is None:
+                    current_timestamp = int(time.time() * 1000)  # Current time in milliseconds
+                    timestamp = current_timestamp
+                elif buy_timestamp is None:
+                    timestamp = sell_timestamp
+                elif sell_timestamp is None:
+                    timestamp = buy_timestamp
+                else:
+                    timestamp = max(buy_timestamp, sell_timestamp)
+                
                 opportunity = OpportunityData(
                     token_pair=symbol,
                     buy_exchange=buy_exchange,
@@ -220,7 +231,7 @@ class ExchangeScanner:
                     price_difference_percentage=price_diff_percentage,
                     buy_volume=buy_volume,
                     sell_volume=sell_volume,
-                    timestamp=max(buy_timestamp, sell_timestamp)
+                    timestamp=timestamp
                 )
                 
                 opportunities.append(opportunity)
