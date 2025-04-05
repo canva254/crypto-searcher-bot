@@ -1,0 +1,65 @@
+/* Custom styles for the Arbitrage Bot UI */
+
+/* Add some padding to the bottom of the page for better scrolling */
+body {
+    padding-bottom: 60px;
+}
+
+/* Add space above cards */
+.card {
+    margin-bottom: 1.5rem;
+}
+
+/* Style for the footer */
+.footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 60px;
+    line-height: 60px;
+    background-color: var(--bs-dark);
+    z-index: 1030;
+}
+
+/* Make tables more readable */
+.table {
+    font-size: 0.9rem;
+}
+
+/* Improve form controls spacing */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+/* Improve button spacing */
+.btn {
+    margin-right: 0.25rem;
+}
+
+/* Add nice transition effects to hover states */
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transition: box-shadow 0.3s ease-in-out;
+}
+
+/* Make sure scrollable tables work well */
+.table-responsive {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* Highlight high-profit opportunities */
+.high-profit {
+    background-color: rgba(25, 135, 84, 0.2) !important;
+}
+
+/* Style for loading spinners */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Improve alert spacing */
+.alert {
+    margin-bottom: 1rem;
+}

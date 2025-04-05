@@ -272,6 +272,220 @@ class UniswapV3Interface:
         fee_percentage = fee_tier / 1_000_000
         return amount * fee_percentage
     
+    def get_pool_liquidity(self, token_a: str, token_b: str, fee: int = FEE_MEDIUM) -> Optional[Dict[str, Any]]:
+        """
+        Get liquidity information for a Uniswap V3 pool
+        
+        Args:
+            token_a: Address of the first token
+            token_b: Address of the second token
+            fee: Fee tier (500, 3000, or 10000)
+            
+        Returns:
+            Dictionary with liquidity information
+        """
+        try:
+            # Get pool address
+            pool_address = self.get_pool_address(token_a, token_b, fee)
+            if not pool_address:
+                return None
+            
+            # Create pool contract instance
+            pool = self.web3.eth.contract(
+                address=Web3.to_checksum_address(pool_address),
+                abi=POOL_ABI
+            )
+            
+            # Get current liquidity
+            liquidity = pool.functions.liquidity().call()
+            
+            # Get token addresses from the pool to determine order
+            token0 = pool.functions.token0().call()
+            token1 = pool.functions.token1().call()
+            
+            # Get token symbols if possible (simplified version)
+            token0_symbol = "Unknown"
+            token1_symbol = "Unknown"
+            
+            for symbol, address in [("ETH", WETH_ADDRESS), ("WBTC", WBTC_ADDRESS), ("USDT", USDT_ADDRESS), ("USDC", USDC_ADDRESS), ("DAI", DAI_ADDRESS)]:
+                if token0.lower() == address.lower():
+                    token0_symbol = symbol
+                if token1.lower() == address.lower():
+                    token1_symbol = symbol
+            
+            return {
+                "pool_address": pool_address,
+                "liquidity": liquidity,
+                "token0": {
+                    "address": token0,
+                    "symbol": token0_symbol
+                },
+                "token1": {
+                    "address": token1,
+                    "symbol": token1_symbol
+                },
+                "fee_tier": fee
+            }
+        except Exception as e:
+            logger.error(f"Error getting pool liquidity: {str(e)}")
+            return None
+    
+    def get_gas_price(self) -> Optional[Dict[str, float]]:
+        """
+        Get current gas prices from the Ethereum network
+        
+        Returns:
+            Dictionary with gas price information in gwei
+        """
+        try:
+            # Get gas price (Wei)
+            gas_price = self.web3.eth.gas_price
+            
+            # Convert to gwei for easier reading
+            gas_price_gwei = gas_price / 10**9
+            
+            # Estimate different speed prices
+            return {
+                "standard": gas_price_gwei,
+                "fast": gas_price_gwei * 1.2,
+                "rapid": gas_price_gwei * 1.5
+            }
+        except Exception as e:
+            logger.error(f"Error getting gas prices: {str(e)}")
+            return None
+    
+    def calculate_price_impact(self, token_in: str, token_out: str, amount_in: float, fee: int = FEE_MEDIUM) -> Optional[Dict[str, Any]]:
+        """
+        Calculate the estimated price impact for a swap
+        
+        Args:
+            token_in: Address of the input token
+            token_out: Address of the output token
+            amount_in: Amount of the input token to swap
+            fee: Fee tier (500, 3000, or 10000)
+            
+        Returns:
+            Dictionary with price impact information
+        """
+        try:
+            # Get the current spot price
+            spot_price = self.get_pool_price(token_in, token_out, fee)
+            if not spot_price:
+                return None
+            
+            # This is a simplified estimation of price impact
+            # In a real implementation, you'd use the x*y=k formula and the actual pool reserves
+            
+            # Calculate fee amount
+            fee_percentage = fee / 1_000_000
+            fee_amount = amount_in * fee_percentage
+            
+            # Simplified estimation of price impact based on the amount relative to pool depth
+            # This is not accurate for large trades but gives a basic estimate
+            pool_info = self.get_pool_liquidity(token_in, token_out, fee)
+            if not pool_info:
+                # If pool info is not available, provide a very rough estimate
+                # Assuming 0.5% impact per 1% of pool liquidity used
+                estimated_impact = 0.005  # Default 0.5% for unknown size
+            else:
+                # Convert liquidity to a usable metric (this is simplified)
+                liquidity = pool_info["liquidity"]
+                if liquidity > 0:
+                    # A very rough estimation, real impact depends on many factors
+                    estimated_impact = min(0.20, (amount_in / (liquidity * spot_price)) * 10)
+                else:
+                    estimated_impact = 0.01  # Default 1% if we can't calculate
+            
+            return {
+                "spot_price": spot_price,
+                "amount_in": amount_in,
+                "estimated_fee": fee_amount,
+                "estimated_price_impact_percentage": estimated_impact * 100,
+                "slippage_tolerance": 0.5,  # Default 0.5% slippage tolerance
+                "minimum_received": amount_in * spot_price * (1 - estimated_impact - 0.005)  # Accounting for slippage
+            }
+        except Exception as e:
+            logger.error(f"Error calculating price impact: {str(e)}")
+            return None
+    
+    def get_token_pair_details(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        Get comprehensive details for a token pair including spot price, liquidity, and gas fees
+        
+        Args:
+            symbol: Trading pair symbol (e.g., 'ETH/USDT')
+            
+        Returns:
+            Dictionary with detailed information about the token pair
+        """
+        try:
+            # Parse the symbol
+            tokens = symbol.split('/')
+            if len(tokens) != 2:
+                logger.error(f"Invalid symbol format: {symbol}")
+                return None
+            
+            base, quote = tokens
+            
+            # Map to token addresses
+            token_map = {
+                'ETH': WETH_ADDRESS,
+                'WETH': WETH_ADDRESS,
+                'BTC': WBTC_ADDRESS,
+                'WBTC': WBTC_ADDRESS,
+                'USDT': USDT_ADDRESS,
+                'USDC': USDC_ADDRESS,
+                'DAI': DAI_ADDRESS
+            }
+            
+            if base not in token_map or quote not in token_map:
+                logger.warning(f"Unsupported token in {symbol}")
+                return None
+            
+            # Get token addresses
+            base_address = token_map[base]
+            quote_address = token_map[quote]
+            
+            # Get price for the best fee tier
+            price = None
+            fee_used = None
+            pool_liquidity = None
+            
+            for fee_tier in [FEE_LOW, FEE_MEDIUM, FEE_HIGH]:
+                current_price = self.get_pool_price(token_map[base], token_map[quote], fee_tier)
+                if current_price:
+                    price = current_price
+                    fee_used = fee_tier
+                    pool_liquidity = self.get_pool_liquidity(token_map[base], token_map[quote], fee_tier)
+                    break
+            
+            if not price:
+                logger.warning(f"No price found for {symbol} on Uniswap V3")
+                return None
+            
+            # Get gas prices
+            gas_prices = self.get_gas_price()
+            
+            # Calculate price impact for a standard trade size (1 unit of base token)
+            price_impact = self.calculate_price_impact(base_address, quote_address, 1.0, fee_used) if fee_used else None
+            
+            # Combine all data
+            return {
+                "symbol": symbol,
+                "base_token": base,
+                "quote_token": quote,
+                "spot_price": price,
+                "fee_tier": fee_used,
+                "fee_percentage": fee_used / 1_000_000 if fee_used else None,
+                "pool_liquidity": pool_liquidity,
+                "gas_prices": gas_prices,
+                "price_impact": price_impact,
+                "timestamp": int(time.time())
+            }
+        except Exception as e:
+            logger.error(f"Error in get_token_pair_details: {str(e)}")
+            return None
+    
     def get_exchange_data(self) -> Dict[str, Any]:
         """
         Return information about Uniswap as an exchange for use in the arbitrage scanner

@@ -24,6 +24,7 @@ db = SQLAlchemy(model_class=Base)
 # Create Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "default_secret_key_for_development")
+app.config['DEBUG'] = True
 
 # Configure database
 database_url = os.environ.get("DATABASE_URL")
@@ -546,3 +547,45 @@ def api_uniswap_config():
             'created_at': config.created_at.isoformat() if config.created_at else None
         }
     })
+
+@app.route('/api/uniswap/details/<token_pair>', methods=['GET'])
+def api_uniswap_details(token_pair):
+    """Get detailed Uniswap data for a specific token pair"""
+    try:
+        # Initialize Uniswap interface
+        uniswap_config = UniswapConfig.query.first()
+        if not uniswap_config or not uniswap_config.is_active:
+            return jsonify({"status": "error", "message": "Uniswap not configured or inactive"}), 400
+            
+        # Import here to avoid circular imports
+        from uniswap_interface import UniswapV3Interface
+        
+        # Initialize interface
+        uniswap = UniswapV3Interface(db)
+        
+        # Format token pair for Uniswap (convert BTC-USDT to BTC/USDT)
+        formatted_pair = token_pair.replace('-', '/')
+        
+        # Get detailed data
+        details = uniswap.get_token_pair_details(formatted_pair)
+        if not details:
+            return jsonify({"status": "error", "message": f"Could not get details for {token_pair}"}), 404
+        
+        # Return the detailed data
+        return jsonify({
+            "status": "success",
+            "token_pair": token_pair,
+            "data": details
+        })
+    except Exception as e:
+        logger.error(f"Error getting Uniswap details: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/uniswap/details')
+def uniswap_details():
+    """Page to display detailed Uniswap data"""
+    # Get token pairs that are configured for arbitrage
+    token_pairs = TokenPair.query.filter_by(is_active=True).all()
+    pair_symbols = [f"{pair.base_token}-{pair.quote_token}" for pair in token_pairs]
+    
+    return render_template('uniswap_details.html', token_pairs=pair_symbols)

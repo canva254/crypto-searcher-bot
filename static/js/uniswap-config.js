@@ -1,59 +1,76 @@
-// Load Uniswap configuration
+// uniswap-config.js - Handles the Uniswap configuration form
+
 async function loadUniswapConfig() {
     try {
         const response = await fetch('/api/uniswap/config');
+        
         if (response.ok) {
             const data = await response.json();
-            if (data.status === 'success') {
-                const config = data.config;
-                document.getElementById('uniswapRpcUrl').value = config.rpc_url || '';
-                document.getElementById('uniswapWalletAddress').value = config.wallet_address || '';
-                document.getElementById('uniswapActiveCheck').checked = config.is_active;
+            
+            if (data.status === 'success' && data.config) {
+                document.getElementById('rpc_url').value = data.config.rpc_url || '';
+                document.getElementById('wallet_address').value = data.config.wallet_address || '';
+                document.getElementById('is_active').checked = data.config.is_active || false;
             }
+        } else {
+            console.warn('No Uniswap configuration found or server error.');
         }
     } catch (error) {
         console.error('Error loading Uniswap configuration:', error);
     }
 }
 
-// Save Uniswap configuration
 function setupUniswapConfigForm() {
-    const saveBtn = document.getElementById('saveUniswapConfigBtn');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', async function() {
-            const rpcUrl = document.getElementById('uniswapRpcUrl').value;
-            const walletAddress = document.getElementById('uniswapWalletAddress').value;
-            const isActive = document.getElementById('uniswapActiveCheck').checked;
-            
-            try {
-                const response = await fetch('/api/uniswap/config', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        rpc_url: rpcUrl,
-                        wallet_address: walletAddress,
-                        is_active: isActive
-                    })
-                });
-                
-                const data = await response.json();
-                if (data.status === 'success') {
-                    alert('Uniswap configuration saved successfully!');
-                } else {
-                    alert('Error saving Uniswap configuration: ' + data.message);
-                }
-            } catch (error) {
-                console.error('Error saving Uniswap configuration:', error);
-                alert('Error saving Uniswap configuration. See console for details.');
-            }
-        });
-    }
-}
-
-// Initialize Uniswap config functionality when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('uniswap-config-form');
+    const successAlert = document.getElementById('uniswap-success-alert');
+    const errorAlert = document.getElementById('uniswap-error-alert');
+    
+    if (!form) return;
+    
+    // Load existing configuration
     loadUniswapConfig();
-    setupUniswapConfigForm();
-});
+    
+    // Handle form submission
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        
+        const formData = {
+            rpc_url: document.getElementById('rpc_url').value,
+            wallet_address: document.getElementById('wallet_address').value,
+            is_active: document.getElementById('is_active').checked
+        };
+        
+        try {
+            const response = await fetch('/api/uniswap/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                // Show success message
+                successAlert.classList.remove('d-none');
+                errorAlert.classList.add('d-none');
+                
+                // Auto-hide after 3 seconds
+                setTimeout(() => {
+                    successAlert.classList.add('d-none');
+                }, 3000);
+            } else {
+                // Show error message
+                errorAlert.textContent = result.message || 'Failed to save Uniswap configuration';
+                errorAlert.classList.remove('d-none');
+                successAlert.classList.add('d-none');
+            }
+        } catch (error) {
+            console.error('Error saving Uniswap configuration:', error);
+            errorAlert.textContent = 'Network error saving Uniswap configuration';
+            errorAlert.classList.remove('d-none');
+            successAlert.classList.add('d-none');
+        }
+    });
+}

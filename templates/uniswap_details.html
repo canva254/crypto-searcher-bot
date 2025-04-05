@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block title %}Uniswap Details{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Uniswap V3 Details</h1>
+
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Select Token Pair</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="token-pair-select" class="form-label">Token Pair</label>
+                    <select class="form-select" id="token-pair-select">
+                        <option value="" selected disabled>Choose a token pair</option>
+                        {% for pair in token_pairs %}
+                        <option value="{{ pair }}">{{ pair }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="d-grid">
+                    <button class="btn btn-primary" id="load-details-btn">Load Details</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card mb-3 d-none" id="details-card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Detailed Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4>Spot Price</h4>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <th scope="row">Current Price</th>
+                                    <td id="spot-price">--</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Base Token</th>
+                                    <td id="base-token">--</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Quote Token</th>
+                                    <td id="quote-token">--</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h4>Liquidity Pool</h4>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <th scope="row">Pool Address</th>
+                                    <td id="pool-address">--</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Fee Tier</th>
+                                    <td id="fee-tier">--</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Total Liquidity</th>
+                                    <td id="total-liquidity">--</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h4>Gas Fees</h4>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <th scope="row">Standard (Gwei)</th>
+                                    <td id="gas-standard">--</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Fast (Gwei)</th>
+                                    <td id="gas-fast">--</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Rapid (Gwei)</th>
+                                    <td id="gas-rapid">--</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h4>Price Impact</h4>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <th scope="row">For 0.1 ETH</th>
+                                    <td id="impact-small">--</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">For 1 ETH</th>
+                                    <td id="impact-medium">--</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">For 10 ETH</th>
+                                    <td id="impact-large">--</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-info" id="loading-indicator" style="display: none;">
+            <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-2">Loading Uniswap data...</span>
+        </div>
+
+        <div class="alert alert-danger d-none" id="error-message"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tokenPairSelect = document.getElementById('token-pair-select');
+    const loadDetailsBtn = document.getElementById('load-details-btn');
+    const detailsCard = document.getElementById('details-card');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const errorMessage = document.getElementById('error-message');
+
+    loadDetailsBtn.addEventListener('click', async function() {
+        const selectedPair = tokenPairSelect.value;
+        
+        if (!selectedPair) {
+            errorMessage.textContent = 'Please select a token pair';
+            errorMessage.classList.remove('d-none');
+            return;
+        }
+        
+        // Hide error, show loading
+        errorMessage.classList.add('d-none');
+        loadingIndicator.style.display = 'block';
+        detailsCard.classList.add('d-none');
+        
+        try {
+            const response = await fetch(`/api/uniswap/details/${selectedPair}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to load Uniswap data');
+            }
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                // Update UI with the data
+                updateUniswapDetails(data.details);
+                detailsCard.classList.remove('d-none');
+            } else {
+                throw new Error(data.message || 'Failed to load Uniswap data');
+            }
+        } catch (error) {
+            console.error('Error loading Uniswap details:', error);
+            errorMessage.textContent = error.message;
+            errorMessage.classList.remove('d-none');
+        } finally {
+            loadingIndicator.style.display = 'none';
+        }
+    });
+    
+    function updateUniswapDetails(details) {
+        // Update spot price section
+        document.getElementById('spot-price').textContent = details.spot_price ? 
+            `${details.spot_price.toFixed(6)} ${details.quote_token}` : 'N/A';
+        document.getElementById('base-token').textContent = details.base_token || 'N/A';
+        document.getElementById('quote-token').textContent = details.quote_token || 'N/A';
+        
+        // Update liquidity pool section
+        document.getElementById('pool-address').textContent = details.pool_address || 'N/A';
+        document.getElementById('fee-tier').textContent = details.fee_tier ? 
+            `${(details.fee_tier / 10000).toFixed(2)}%` : 'N/A';
+        document.getElementById('total-liquidity').textContent = details.liquidity ? 
+            `$${details.liquidity.toLocaleString()}` : 'N/A';
+        
+        // Update gas fees section
+        if (details.gas_prices) {
+            document.getElementById('gas-standard').textContent = 
+                details.gas_prices.standard ? `${details.gas_prices.standard.toFixed(2)}` : 'N/A';
+            document.getElementById('gas-fast').textContent = 
+                details.gas_prices.fast ? `${details.gas_prices.fast.toFixed(2)}` : 'N/A';
+            document.getElementById('gas-rapid').textContent = 
+                details.gas_prices.rapid ? `${details.gas_prices.rapid.toFixed(2)}` : 'N/A';
+        }
+        
+        // Update price impact section
+        if (details.price_impact) {
+            document.getElementById('impact-small').textContent = 
+                details.price_impact.small ? `${details.price_impact.small.toFixed(4)}%` : 'N/A';
+            document.getElementById('impact-medium').textContent = 
+                details.price_impact.medium ? `${details.price_impact.medium.toFixed(4)}%` : 'N/A';
+            document.getElementById('impact-large').textContent = 
+                details.price_impact.large ? `${details.price_impact.large.toFixed(4)}%` : 'N/A';
+        }
+    }
+});
+</script>
+{% endblock %}

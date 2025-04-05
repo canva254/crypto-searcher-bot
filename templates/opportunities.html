@@ -1,98 +1,49 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitrage Opportunities - Crypto Arbitrage Scanner</title>
-    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">Crypto Arbitrage Scanner</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/opportunities">Opportunities</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/settings">Settings</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+{% extends 'base.html' %}
 
-    <div class="container mt-4">
-        <div class="row">
-            <div class="col-md-12">
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">All Arbitrage Opportunities</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-dark">
-                                <thead>
-                                    <tr>
-                                        <th>Time</th>
-                                        <th>Pair</th>
-                                        <th>Buy Exchange</th>
-                                        <th>Buy Price</th>
-                                        <th>Sell Exchange</th>
-                                        <th>Sell Price</th>
-                                        <th>Price Diff %</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="opportunitiesTable">
-                                    {% if opportunities %}
-                                        {% for opp in opportunities %}
-                                        <tr>
-                                            <td>{{ opp.timestamp.strftime('%H:%M:%S') }}</td>
-                                            <td>{{ opp.token_pair }}</td>
-                                            <td>{{ opp.buy_exchange }}</td>
-                                            <td>${{ '%.2f'|format(opp.buy_price) }}</td>
-                                            <td>{{ opp.sell_exchange }}</td>
-                                            <td>${{ '%.2f'|format(opp.sell_price) }}</td>
-                                            <td {% if opp.price_difference_percentage > 1 %}class="text-success"{% elif opp.price_difference_percentage > 0.5 %}class="text-warning"{% else %}class="text-info"{% endif %}>
-                                                {{ '%.2f'|format(opp.price_difference_percentage) }}%
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% else %}
-                                        <tr>
-                                            <td colspan="7" class="text-center">No opportunities found yet</td>
-                                        </tr>
-                                    {% endif %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+{% block title %}Arbitrage Opportunities{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Arbitrage Opportunities</h1>
+
+<div class="card">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0">Recent Opportunities</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Token Pair</th>
+                        <th>Buy Exchange</th>
+                        <th>Buy Price</th>
+                        <th>Sell Exchange</th>
+                        <th>Sell Price</th>
+                        <th>Profit %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if opportunities %}
+                        {% for opportunity in opportunities %}
+                        <tr>
+                            <td>{{ opportunity.timestamp.strftime('%H:%M:%S') }}</td>
+                            <td>{{ opportunity.token_pair }}</td>
+                            <td>{{ opportunity.buy_exchange }}</td>
+                            <td>{{ opportunity.buy_price }}</td>
+                            <td>{{ opportunity.sell_exchange }}</td>
+                            <td>{{ opportunity.sell_price }}</td>
+                            <td>{{ '%0.2f' % opportunity.price_difference_percentage }}%</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center">No opportunities found.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
         </div>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/feather-icons"></script>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            feather.replace();
-            
-            // Auto-refresh the page every 30 seconds
-            setInterval(function() {
-                location.reload();
-            }, 30000);
-        });
-    </script>
-</body>
-</html>
+</div>
+{% endblock %}
