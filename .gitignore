@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -15,7 +16,6 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -23,31 +23,31 @@ wheels/
 # Flask
 instance/
 .webassets-cache
+flask_session/
 
-# Environment
-.env
-.venv
-env/
+# Virtual Environment
 venv/
 ENV/
-env.bak/
-venv.bak/
+env/
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
+# Environment variables
+.env
+.flaskenv
 
 # Database
 *.db
 *.sqlite3
 
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
 # Logs
 logs/
 *.log
 
-# Local configuration
-/settings.json
-/config.json
+# OS specific files
+.DS_Store
+Thumbs.db
