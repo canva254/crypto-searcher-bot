@@ -5,6 +5,7 @@ import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 import traceback
+from uniswap_interface import UniswapV3Interface
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -59,6 +60,15 @@ class ExchangeScanner:
         self.rate_limiters = {}
         self.default_symbols = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "ADA/USDT"]
         self.exchange_instances = {}
+        
+        # Initialize Uniswap V3 interface
+        try:
+            self.uniswap = UniswapV3Interface(db=self.db)
+            logger.info("Uniswap V3 interface initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Uniswap V3 interface: {str(e)}")
+            self.uniswap = None
+            
         logger.info("ExchangeScanner initialized")
     
     def _initialize_exchange(self, exchange_config):
@@ -111,6 +121,46 @@ class ExchangeScanner:
         """Convert a TokenPair database object to a ccxt symbol format"""
         return f"{token_pair.base_token}/{token_pair.quote_token}"
     
+    def get_uniswap_prices(self, symbols_to_check):
+        """
+        Get price data from Uniswap V3 for the specified symbols
+        
+        Args:
+            symbols_to_check: List of symbols to check prices for
+            
+        Returns:
+            Dictionary containing price data for the symbols
+        """
+        if not self.uniswap:
+            logger.warning("Uniswap V3 interface not initialized")
+            return {}
+            
+        uniswap_prices = {}
+        current_timestamp = int(time.time() * 1000)  # Current time in milliseconds
+        
+        # Check which symbols are supported by Uniswap
+        supported_pairs = self.uniswap.get_exchange_data().get('supported_pairs', [])
+        
+        for symbol in symbols_to_check:
+            if symbol in supported_pairs:
+                try:
+                    price = self.uniswap.get_token_pair_price(symbol)
+                    if price:
+                        uniswap_prices[symbol] = {
+                            'price': price,
+                            # For Uniswap, we don't have separate bid/ask so use price for both
+                            'bid': price,
+                            'ask': price,
+                            # We don't have volume data from our simple implementation
+                            'volume': 0,
+                            'timestamp': current_timestamp
+                        }
+                        logger.info(f"Got Uniswap V3 price for {symbol}: {price}")
+                except Exception as e:
+                    logger.error(f"Error getting Uniswap price for {symbol}: {str(e)}")
+        
+        return uniswap_prices
+        
     def scan_exchanges(self, exchange_configs, token_pairs):
         """
         Scan all active exchanges for price differences on specified token pairs
@@ -136,8 +186,8 @@ class ExchangeScanner:
                     active_exchanges.append(exchange)
             
             # If we don't have enough exchanges, we can't find arbitrage opportunities
-            if len(active_exchanges) < 2:
-                logger.warning(f"Not enough active exchanges. Need at least 2, got {len(active_exchanges)}")
+            if len(active_exchanges) < 1:  # Changed from 2 to 1 since we'll add Uniswap
+                logger.warning(f"Not enough active exchanges. Need at least 1, got {len(active_exchanges)}")
                 return []
             
             # Use default symbols if no token pairs are configured
@@ -173,6 +223,12 @@ class ExchangeScanner:
                     except Exception as e:
                         logger.error(f"Error fetching {symbol} from {exchange.id}: {str(e)}")
                         continue
+                        
+            # Add Uniswap V3 prices if available
+            if self.uniswap:
+                uniswap_prices = self.get_uniswap_prices(symbols_to_check)
+                if uniswap_prices:
+                    exchange_prices['uniswap_v3'] = uniswap_prices
             
             # Find arbitrage opportunities across exchanges
             for symbol in symbols_to_check:

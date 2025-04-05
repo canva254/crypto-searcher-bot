@@ -1,0 +1,182 @@
+Let’s integrate Uniswap V3 into your existing Python arbitrage bot. Below is a step-by-step guide with code examples to fetch price data, calculate fees, and execute swaps. We’ll use Python’s web3.py and web3-ethereum-defi libraries.
+Step 1: Install Required Libraries
+bash
+Copy
+
+pip install web3 web3-ethereum-defi python-dotenv
+
+Step 2: Set Up Environment Variables
+
+Create a .env file for sensitive data:
+env
+Copy
+
+RPC_URL="https://mainnet.infura.io/v3/YOUR_INFURA_KEY"
+WALLET_ADDRESS="0xYourWalletAddress"
+PRIVATE_KEY="YourPrivateKey"  # Only needed for executing trades
+
+Step 3: Connect to Ethereum via Web3
+python
+Copy
+
+import os
+from dotenv import load_dotenv
+from web3 import Web3
+
+# Load environment variables
+load_dotenv()
+
+# Connect to Ethereum
+rpc_url = os.getenv("RPC_URL")
+web3 = Web3(Web3.HTTPProvider(rpc_url))
+assert web3.is_connected(), "Failed to connect to Ethereum!"
+
+Step 4: Fetch Uniswap V3 Pool Data
+A. Define Token Addresses
+python
+Copy
+
+# Ethereum mainnet token addresses (WETH and DAI example)
+WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+
+B. Fetch Pool Address
+python
+Copy
+
+from eth_defi.uniswap_v3.pool import fetch_pool_details
+
+# Uniswap V3 Factory address
+UNISWAP_V3_FACTORY_ADDRESS = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+
+# Fetch the 0.3% fee pool for WETH/DAI
+pool = fetch_pool_details(
+    web3,
+    UNISWAP_V3_FACTORY_ADDRESS,
+    WETH_ADDRESS,
+    DAI_ADDRESS,
+    fee_tier=3000,  # 0.3% fee tier
+)
+
+pool_address = pool.address
+print(f"Pool Address: {pool_address}")
+
+Step 5: Fetch Current Price from Uniswap V3
+python
+Copy
+
+from eth_defi.uniswap_v3.price import get_price
+
+# Get current price (DAI per WETH)
+price = get_price(web3, pool_address, WETH_ADDRESS, DAI_ADDRESS)
+print(f"1 WETH = {price} DAI")
+
+# Inverse price (WETH per DAI)
+inverse_price = get_price(web3, pool_address, DAI_ADDRESS, WETH_ADDRESS)
+print(f"1 DAI = {inverse_price} WETH")
+
+Step 6: Calculate Swap Fees
+python
+Copy
+
+# Get pool fee tier (e.g., 3000 = 0.3%)
+fee_tier = pool.fee / 1_000_000  # Convert to percentage
+print(f"Pool Fee: {fee_tier}%")
+
+# Example swap fee for 1 ETH swap
+amount_in_wei = web3.to_wei(1, "ether")  # 1 ETH
+swap_fee = amount_in_wei * fee_tier / 100
+print(f"Swap Fee (ETH): {web3.from_wei(swap_fee, 'ether')}")
+
+Step 7: Integrate with Your Arbitrage Bot
+A. Add Uniswap V3 Price Fetching
+python
+Copy
+
+def fetch_uniswap_v3_price(token_in, token_out, fee_tier=3000):
+    pool = fetch_pool_details(
+        web3,
+        UNISWAP_V3_FACTORY_ADDRESS,
+        token_in,
+        token_out,
+        fee_tier=fee_tier,
+    )
+    return get_price(web3, pool.address, token_in, token_out)
+
+# Example usage
+weth_dai_price = fetch_uniswap_v3_price(WETH_ADDRESS, DAI_ADDRESS)
+print(f"Uniswap V3 Price: {weth_dai_price}")
+
+B. Compare Prices with Other Exchanges
+python
+Copy
+
+def check_arbitrage():
+    # Fetch prices from Uniswap and other exchanges
+    uniswap_price = fetch_uniswap_v3_price(WETH_ADDRESS, DAI_ADDRESS)
+    binance_price = get_binance_price("ETHUSDT")  # Your existing CEX function
+    coinbase_price = get_coinbase_price("ETH-USD")  # Your existing CEX function
+
+    # Calculate arbitrage spread
+    spread_binance = binance_price - uniswap_price
+    spread_coinbase = coinbase_price - uniswap_price
+
+    if spread_binance > MIN_PROFIT_THRESHOLD:
+        print(f"Arbitrage Opportunity (Binance): {spread_binance}")
+    elif spread_coinbase > MIN_PROFIT_THRESHOLD:
+        print(f"Arbitrage Opportunity (Coinbase): {spread_coinbase}")
+
+Step 8: Execute a Swap (Optional)
+
+To execute trades, use the web3-ethereum-defi library. Caution: Test on Sepolia first!
+python
+Copy
+
+from eth_defi.uniswap_v3.deployment import UniswapV3Deployment
+from eth_defi.uniswap_v3.swap import swap_with_slippage_protection
+
+# Load Uniswap V3 contracts
+uniswap = UniswapV3Deployment.from_json(web3, "mainnet")
+
+# Prepare swap parameters
+swap_params = {
+    "recipient": os.getenv("WALLET_ADDRESS"),
+    "token_in": WETH_ADDRESS,
+    "token_out": DAI_ADDRESS,
+    "amount_in": web3.to_wei(0.1, "ether"),  # 0.1 ETH
+    "slippage": 1.0,  # 1% slippage tolerance
+    "fee_tier": 3000,
+}
+
+# Execute swap
+tx_hash = swap_with_slippage_protection(uniswap, **swap_params)
+print(f"Swap TX: https://etherscan.io/tx/{tx_hash.hex()}")
+
+Step 9: Full Workflow Integration
+python
+Copy
+
+import time
+
+def main():
+    while True:
+        try:
+            check_arbitrage()
+            time.sleep(3)  # Poll every 3 seconds
+        except Exception as e:
+            print(f"Error: {e}")
+            time.sleep(60)
+
+if __name__ == "__main__":
+    main()
+
+Key Considerations
+
+    Gas Fees: Use web3.eth.gas_price to estimate costs and include them in profit calculations.
+
+    Slippage: Adjust the slippage parameter based on liquidity.
+
+    Security: Never hardcode private keys. Use environment variables or vaults.
+
+    Testing: Deploy on Sepolia testnet first (replace RPC URL and token addresses).
+

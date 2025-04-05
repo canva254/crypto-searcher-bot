@@ -60,3 +60,14 @@ class Settings(db.Model):
 
     def __repr__(self):
         return f"<Settings scan_interval={self.scan_interval}s min_profit={self.min_profit_threshold}%>"
+        
+class UniswapConfig(db.Model):
+    """Configuration for Uniswap V3 integration"""
+    id = db.Column(db.Integer, primary_key=True)
+    rpc_url = db.Column(db.String(255), nullable=True)
+    wallet_address = db.Column(db.String(42), nullable=True)  # Ethereum address is 42 chars (0x + 40 hex chars)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<UniswapConfig id={self.id} active={self.is_active}>"

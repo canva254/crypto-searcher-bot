@@ -41,7 +41,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
 # Import modules after app creation to avoid circular imports
-from models import ArbitrageOpportunity, ExchangeConfig, TokenPair, Settings
+from models import ArbitrageOpportunity, ExchangeConfig, TokenPair, Settings, UniswapConfig
 from exchange_scanner import ExchangeScanner
 
 # Initialize components
@@ -94,6 +94,17 @@ def initialize_components():
             ]
             for pair in default_pairs:
                 db.session.add(pair)
+        
+        # Add default Uniswap config if none exists
+        uniswap_config = UniswapConfig.query.first()
+        if not uniswap_config:
+            logger.info("Adding default Uniswap V3 configuration")
+            # Use the default Infura endpoint for development
+            uniswap_config = UniswapConfig(
+                rpc_url="https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161",
+                is_active=True
+            )
+            db.session.add(uniswap_config)
         
         db.session.commit()
         
@@ -297,13 +308,28 @@ def api_configured_exchanges():
     """Return list of exchanges that have been configured in the system"""
     try:
         exchanges = ExchangeConfig.query.all()
-        return jsonify([{
+        exchange_list = [{
             'id': ex.id,
             'exchange_name': ex.exchange_name,
             'is_active': ex.is_active,
             'has_api_key': bool(ex.api_key),
             'created_at': ex.created_at.isoformat() if ex.created_at else None
-        } for ex in exchanges])
+        } for ex in exchanges]
+        
+        # Add Uniswap if it's configured
+        uniswap_config = UniswapConfig.query.first()
+        if uniswap_config and uniswap_config.is_active:
+            # Add Uniswap as a special exchange type
+            exchange_list.append({
+                'id': 'uniswap_v3',  # Use a fixed ID for Uniswap
+                'exchange_name': 'uniswap_v3',
+                'display_name': 'Uniswap V3',
+                'is_active': uniswap_config.is_active,
+                'has_api_key': bool(uniswap_config.rpc_url),  # Consider having RPC URL as having an "API key"
+                'created_at': uniswap_config.created_at.isoformat() if uniswap_config.created_at else None
+            })
+            
+        return jsonify(exchange_list)
     except Exception as e:
         logger.error(f"Error getting configured exchanges: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -461,3 +487,62 @@ def api_start_scanner():
 def api_stop_scanner():
     stop_scanner()
     return jsonify({'status': 'success', 'message': 'Scanner stopped'})
+
+@app.route('/api/uniswap/config', methods=['GET', 'POST'])
+def api_uniswap_config():
+    """Get or update Uniswap configuration"""
+    if request.method == 'POST':
+        try:
+            data = request.json
+            config = UniswapConfig.query.first()
+            
+            if not config:
+                config = UniswapConfig()
+                db.session.add(config)
+            
+            if 'rpc_url' in data:
+                config.rpc_url = data.get('rpc_url')
+            
+            if 'wallet_address' in data:
+                config.wallet_address = data.get('wallet_address')
+                
+            if 'is_active' in data:
+                config.is_active = data.get('is_active')
+            
+            db.session.commit()
+            logger.info("Uniswap configuration updated")
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'Uniswap configuration updated successfully',
+                'config': {
+                    'id': config.id,
+                    'rpc_url': config.rpc_url,
+                    'wallet_address': config.wallet_address,
+                    'is_active': config.is_active,
+                    'created_at': config.created_at.isoformat() if config.created_at else None
+                }
+            })
+        except Exception as e:
+            logger.error(f"Error updating Uniswap configuration: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 400
+    
+    # GET request
+    config = UniswapConfig.query.first()
+    
+    if not config:
+        return jsonify({
+            'status': 'error',
+            'message': 'Uniswap configuration not found'
+        }), 404
+    
+    return jsonify({
+        'status': 'success',
+        'config': {
+            'id': config.id,
+            'rpc_url': config.rpc_url,
+            'wallet_address': config.wallet_address,
+            'is_active': config.is_active,
+            'created_at': config.created_at.isoformat() if config.created_at else None
+        }
+    })
